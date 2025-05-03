@@ -17,11 +17,6 @@ const search = (value: string) => {
   })
 }
 
-// 更新createType的值
-const updateCreateType = (value: string) => {
-  createType.value = value
-}
-
 // 监听路由里的search_word变化
 watch(
   () => route.query?.search_word,
@@ -45,7 +40,12 @@ watch(
           <div class="text-lg font-medium text-gray-900">个人空间</div>
         </div>
         <!-- 创建按钮 -->
-        <a-button v-if="route.path.startsWith('/space/apps')" type="primary" class="rounded-lg">
+        <a-button
+          v-if="route.path.startsWith('/space/apps')"
+          type="primary"
+          class="rounded-lg"
+          @click="createType = 'app'"
+        >
           创建 AI 应用
         </a-button>
         <a-button
@@ -60,6 +60,7 @@ watch(
           v-if="route.path.startsWith('/space/workflows')"
           type="primary"
           class="rounded-lg"
+          @click="createType = 'workflow'"
         >
           创建工作流
         </a-button>
@@ -115,7 +116,7 @@ watch(
       </div>
     </div>
     <!-- 中间内容 -->
-    <router-view :create-type="createType" @update-create-type="updateCreateType" />
+    <router-view v-model:create-type="createType" />
   </div>
 </template>
 

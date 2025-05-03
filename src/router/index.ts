@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { isLogin } from '@/utils/auth'
+import auth from '@/utils/auth'
 import DefaultLayout from '@/views/layouts/DefaultLayout.vue'
 import BlankLayout from '@/views/layouts/BlankLayout.vue'
 
@@ -56,6 +56,11 @@ const router = createRouter({
           component: () => import('@/views/space/datasets/documents/CreateView.vue'),
         },
         {
+          path: 'space/datasets/:dataset_id/documents/:document_id/segments',
+          name: 'space-datasets-documents-segments-list',
+          component: () => import('@/views/space/datasets/documents/segments/ListView.vue'),
+        },
+        {
           path: 'store/apps',
           name: 'store-apps-list',
           component: () => import('@/views/store/apps/ListView.vue'),
@@ -66,9 +71,20 @@ const router = createRouter({
           component: () => import('@/views/store/tools/ListView.vue'),
         },
         {
-          path: 'open',
-          name: 'open-index',
-          component: () => import('@/views/open/IndexView.vue'),
+          path: 'openapi',
+          component: () => import('@/views/openapi/OpenAPILayoutView.vue'),
+          children: [
+            {
+              path: '',
+              name: 'openapi-index',
+              component: () => import('@/views/openapi/IndexView.vue'),
+            },
+            {
+              path: 'api-keys',
+              name: 'openapi-api-keys-list',
+              component: () => import('@/views/openapi/api-keys/ListView.vue'),
+            },
+          ],
         },
       ],
     },
@@ -82,18 +98,58 @@ const router = createRouter({
           component: () => import('@/views/auth/LoginView.vue'),
         },
         {
-          path: 'space/apps/:app_id',
-          name: 'space-apps-detail',
-          component: () => import('@/views/space/apps/DetailView.vue'),
+          path: 'auth/authorize/:provider_name',
+          name: 'auth-authorize',
+          component: () => import('@/views/auth/AuthorizeView.vue'),
+        },
+        {
+          path: 'space/apps',
+          component: () => import('@/views/space/apps/AppLayoutView.vue'),
+          children: [
+            {
+              path: ':app_id',
+              name: 'space-apps-detail',
+              component: () => import('@/views/space/apps/DetailView.vue'),
+            },
+            {
+              path: ':app_id/published',
+              name: 'space-apps-published',
+              component: () => import('@/views/space/apps/PublishedView.vue'),
+            },
+            {
+              path: ':app_id/analysis',
+              name: 'space-apps-analysis',
+              component: () => import('@/views/space/apps/AnalysisView.vue'),
+            },
+          ],
+        },
+        {
+          path: 'space/workflows/:workflow_id',
+          name: 'space-workflows-detail',
+          component: () => import('@/views/space/workflows/DetailView.vue'),
+        },
+        {
+          path: 'web-apps/:token',
+          name: 'web-apps-index',
+          component: () => import('@/views/web-apps/IndexView.vue'),
+        },
+        {
+          path: '/errors/404',
+          name: 'errors-not-found',
+          component: () => import('@/views/errors/NotFoundView.vue'),
+        },
+        {
+          path: '/errors/403',
+          name: 'errors-forbidden',
+          component: () => import('@/views/errors/ForbiddenView.vue'),
         },
       ],
     },
   ],
 })
 
-// todo:路由守卫逻辑还未实现
-router.beforeEach(async (to, from) => {
-  if (!isLogin() && to.name != 'auth-login') {
+router.beforeEach(async (to) => {
+  if (!auth.isLogin() && !['auth-login', 'auth-authorize'].includes(to.name as string)) {
     return { path: '/auth/login' }
   }
 })

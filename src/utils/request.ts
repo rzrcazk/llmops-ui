@@ -85,6 +85,135 @@ const baseFetch = <T>(url: string, fetchOptions: FetchOptionType): Promise<T> =>
   ]) as Promise<T>
 }
 
+// 5.封装基于post的sse(流式事件响应)请求
+export const ssePost = async (
+  url: string,
+  fetchOptions: FetchOptionType,
+  onData: (data: { [key: string]: any }) => void,
+) => {
+  // 5.1 组装基础的fetch请求配置
+  const options = Object.assign({}, baseFetchOptions, { method: 'POST' }, fetchOptions)
+
+  // 5.2 组装请求URL
+  const urlWithPrefix = `${apiPrefix}${url.startsWith('/') ? url : `/${url}`}`
+
+  // 5.3 结构body参数，并处理body对应的数据
+  const { body } = fetchOptions
+  if (body) options.body = JSON.stringify(body)
+
+  // 5.4 发起fetch请求并处理流式事件响应
+  const response = await globalThis.fetch(urlWithPrefix, options as RequestInit)
+  return handleStream(response, onData)
+}
+
+const handleStream = (response: Response, onData: (data: { [key: string]: any }) => void) => {
+  // 1.检测网络请求是否正常
+  if (!response.ok) throw new Error('网络请求失败')
+
+  // 2.构建reader以及deocder
+  const reader = response.body?.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+
+  // 3.构建read函数用于去读取数据
+  const read = () => {
+    let hasError = false
+    reader?.read().then((result: any) => {
+      if (result.done) return
+
+      buffer += decoder.decode(result.value, { stream: true })
+      const lines = buffer.split('\n')
+
+      let event = ''
+      let data = ''
+
+      try {
+        lines.forEach((line) => {
+          line = line.trim()
+          if (line.startsWith('event:')) {
+            event = line.slice(6).trim()
+          } else if (line.startsWith('data:')) {
+            data = line.slice(5).trim()
+          }
+
+          // 每个事件以空行结束，只有event和data同时存在，才表示一次流式事件的数据完整获取到了
+          if (line === '') {
+            if (event !== '' && data !== '') {
+              onData({
+                event: event,
+                data: JSON.parse(data),
+              })
+              event = ''
+              data = ''
+            }
+          }
+        })
+        buffer = lines.pop() || ''
+      } catch (e) {
+        hasError = true
+      }
+
+      if (!hasError) read()
+    })
+  }
+
+  // 4.调用read函数去执行获取对应的数据
+  read()
+}
+
+export const upload = <T>(url: string, options = {}): Promise<T> => {
+  // 1 组装请求URL
+  const urlWithPrefix = `${apiPrefix}${url.startsWith('/') ? url : `/${url}`}`
+
+  // 2.组装xhr请求配置信息
+  const defaultOptions = {
+    method: 'POST',
+    url: urlWithPrefix,
+    headers: {},
+    data: {},
+  }
+  options = {
+    ...defaultOptions,
+    ...options,
+    headers: { ...defaultOptions.headers, ...options.headers },
+  }
+
+  // 3.构建promise并使用xhr完成文件上传
+  return new Promise((resolve, reject) => {
+    // 4.创建xhr服务
+    const xhr = new XMLHttpRequest()
+
+    // 5.初始化xhr请求并配置headers
+    xhr.open(options.method, options.url)
+    for (const key in options.headers) {
+      xhr.setRequestHeader(key, options.headers[key])
+    }
+
+    // 6.设置xhr响应格式并携带授权凭证（例如cookie）
+    xhr.withCredentials = true
+    xhr.responseType = 'json'
+
+    // 7.监听xhr状态变化并导出数据
+    xhr.onreadystatechange = () => {
+      // 8.判断xhr的状态是不是为4，如果为4则代表已经传输完成（涵盖成功与失败）
+      if (xhr.readyState === 4) {
+        // 9.检查响应状态码，当HTTP状态码为200的时候表示请求成功
+        if (xhr.status === 200) {
+          resolve(xhr.response)
+        } else {
+          reject(xhr)
+        }
+      }
+    }
+
+    // 10.添加xhr进度监听
+    xhr.upload.onprogress = options.onprogress
+
+    // 11.发送请求
+    xhr.send(options.data)
+  })
+}
+
 export const request = <T>(url: string, options = {}) => {
   return baseFetch<T>(url, options)
 }
